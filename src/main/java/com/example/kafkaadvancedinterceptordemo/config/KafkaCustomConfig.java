@@ -14,12 +14,17 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.kafka.KafkaProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.task.TaskExecutor;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.*;
 import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.kafka.listener.RecordInterceptor;
 import org.springframework.kafka.support.serializer.JsonDeserializer;
 import org.springframework.kafka.support.serializer.JsonSerializer;
+import org.springframework.retry.backoff.FixedBackOffPolicy;
+import org.springframework.retry.policy.SimpleRetryPolicy;
+import org.springframework.retry.support.RetryTemplate;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.util.backoff.FixedBackOff;
 
 import java.time.LocalDateTime;
@@ -92,5 +97,31 @@ public class KafkaCustomConfig {
             }
         });
         return factory;
+    }
+
+    @Bean("sagaAsyncRetryTemplate")
+    public RetryTemplate createRetryTemplate() {
+        RetryTemplate retryTemplate = new RetryTemplate();
+
+        // ✅ Retry Policy (e.g., retry max 3 times for any Exception)
+        SimpleRetryPolicy retryPolicy = new SimpleRetryPolicy(5);
+        retryTemplate.setRetryPolicy(retryPolicy);
+
+        // ✅ Backoff Policy (e.g., wait 2 seconds between retries)
+        FixedBackOffPolicy backOffPolicy = new FixedBackOffPolicy();
+        backOffPolicy.setBackOffPeriod(1000);
+        retryTemplate.setBackOffPolicy(backOffPolicy);
+
+        return retryTemplate;
+    }
+    @Bean("stacksagaKafkaAsyncTaskExecutor")
+    public TaskExecutor taskExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(5);           // number of core threads
+        executor.setMaxPoolSize(10);           // max threads
+        executor.setQueueCapacity(50);         // queue before creating extra threads
+        executor.setThreadNamePrefix("saga-async-");
+        executor.initialize();                 // IMPORTANT: start the executor
+        return executor;
     }
 }
