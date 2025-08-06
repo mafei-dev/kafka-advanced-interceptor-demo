@@ -1,4 +1,4 @@
-package com.example.kafkaadvancedinterceptordemo.config;
+package org.sample.config;
 
 import com.example.kafkaadvancedinterceptordemo.exception.RetryableException;
 import com.example.kafkaadvancedinterceptordemo.exception.SagaNonRetryableException;
