@@ -1,5 +1,6 @@
 package com.example.kafkaadvancedinterceptordemo.endpoint;
 
+import com.example.kafkaadvancedinterceptordemo.annotation.SagaKafkaListener;
 import com.example.kafkaadvancedinterceptordemo.exception.RetryableException;
 import com.example.kafkaadvancedinterceptordemo.exception.SagaNonRetryableException;
 import com.example.kafkaadvancedinterceptordemo.payload.SagaPayload;
@@ -7,10 +8,15 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.core.task.TaskExecutor;
 import org.springframework.kafka.annotation.DltHandler;
+import org.springframework.kafka.config.KafkaListenerEndpointRegistry;
 import org.springframework.retry.RetryCallback;
 import org.springframework.retry.support.RetryTemplate;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+
+import java.lang.reflect.Method;
+import java.util.Objects;
+import java.util.concurrent.RejectedExecutionException;
 
 @Slf4j
 public abstract class SampleEndpoint {
@@ -19,7 +25,10 @@ public abstract class SampleEndpoint {
     RetryTemplate retryTemplate;
     @Autowired
     @Qualifier("stacksagaKafkaAsyncTaskExecutor")
-    TaskExecutor taskExecutor;
+    ThreadPoolTaskExecutor taskExecutor;
+    ThreadPoolTaskExecutor realTaskExecutor;
+    @Autowired
+    private KafkaListenerEndpointRegistry registry;
 
     protected abstract void onMessage(ConsumerRecord<String, SagaPayload> record) throws SagaNonRetryableException, RetryableException;
 
@@ -27,10 +36,21 @@ public abstract class SampleEndpoint {
         log.info("doProcessAsyncInAction:default");
     }
 
-    public final void doProcessAsync(ConsumerRecord<String, SagaPayload> consumerRecord) {
+    public final void doProcessAsync(ConsumerRecord<String, SagaPayload> consumerRecord) throws RejectedExecutionException {
+        try {
+            Method onMessage = this.getClass().getMethod("onMessage", ConsumerRecord.class);
+            SagaKafkaListener annotation = onMessage.getAnnotation(SagaKafkaListener.class);
+            Objects.requireNonNull(registry.getListenerContainer(annotation.id())).pause();
+        } catch (NoSuchMethodException e) {
+            throw new RuntimeException(e);
+        }
+
+/*
         this.taskExecutor.execute(() -> {
             this.doProcessAsyncInActionInternal(consumerRecord);
         });
+*/
+
     }
 
     private void doProcessAsyncInActionInternal(ConsumerRecord<String, SagaPayload> consumerRecord) {
@@ -58,4 +78,9 @@ public abstract class SampleEndpoint {
     protected RetryTemplate getRetryTemplate() {
         return this.retryTemplate;
     }
+
+    protected ThreadPoolTaskExecutor getThreadPoolTaskExecutor() {
+        return this.taskExecutor;
+    }
+
 }

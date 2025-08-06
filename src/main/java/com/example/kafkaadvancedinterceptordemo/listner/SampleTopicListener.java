@@ -17,7 +17,7 @@ import org.springframework.stereotype.Component;
 public class SampleTopicListener extends SampleEndpoint {
 
 
-    @SagaKafkaListener("TEST_TOPIC")
+    @SagaKafkaListener(value = "TEST_TOPIC", id = "TEST_TOPIC_ID")
 //    @RetryableTopic(attempts = "2", backoff = @Backoff(delay = 2000), dltStrategy = DltStrategy.FAIL_ON_ERROR)
     public void onMessage(ConsumerRecord<String, SagaPayload> record) throws SagaNonRetryableException, SagaNonRetryableException {
         log.info("onMessage");

@@ -18,6 +18,9 @@ public @interface SagaKafkaListener {
     @AliasFor(annotation = KafkaListener.class, attribute = "topics")
     String value();
 
+    @AliasFor(annotation = KafkaListener.class, attribute = "id")
+    String id();
+
     @AliasFor(annotation = KafkaListener.class, attribute = "concurrency")
     String concurrency() default "";
 
